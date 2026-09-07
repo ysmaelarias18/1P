@@ -1,61 +1,44 @@
 name: Build BeTube APK
-
 on:
   push:
     branches: [ "master" ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout build repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Fetch SmartTube 32.38s
         run: |
           git clone --depth 1 --branch 32.38s https://github.com/yuliskov/SmartTube.git source
           cd source
           git submodule update --init --recursive
-
       - name: Apply BeTube branding
         working-directory: source
         shell: bash
         run: |
-          sed -i 's/applicationId "app.smarttube"/applicationId "com.betube.tv"/' smarttubetv/build.gradle
-          sed -i 's/applicationId "org.smarttube.beta"/applicationId "com.betube.tv.beta"/' smarttubetv/build.gradle
-          sed -i 's/applicationId "org.smarttube.stable"/applicationId "com.betube.tv"/' smarttubetv/build.gradle
-          sed -i 's/applicationId "app.smarttube.fdroid"/applicationId "com.betube.tv.fdroid"/' smarttubetv/build.gradle
+          # Keep upstream stable applicationId so bundled Google services configuration remains valid.
           sed -i 's/def project = "SmartTube"/def project = "BeTube"/' smarttubetv/build.gradle
           sed -i 's/<!\[CDATA\[SmartTube\]\]>/<![CDATA[BeTube]]>/g' smarttubetv/src/main/res/values/strings.xml
-
           mkdir -p smarttubetv/src/main/res/drawable
           cat > smarttubetv/src/main/res/drawable/betube_icon.xml <<'EOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="512dp" android:height="512dp"
-              android:viewportWidth="512" android:viewportHeight="512">
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="512dp" android:height="512dp" android:viewportWidth="512" android:viewportHeight="512">
             <path android:fillColor="#070A0F" android:pathData="M0,0h512v512h-512z"/>
             <path android:fillColor="#F5142D" android:pathData="M96,116Q96,76 136,76H376Q416,76 416,116V356Q416,396 376,396H136Q96,396 96,356Z"/>
             <path android:fillColor="#FFFFFF" android:pathData="M218,174L218,298L326,236Z"/>
           </vector>
           EOF
-
           cat > smarttubetv/src/main/res/drawable/betube_banner.xml <<'EOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="320dp" android:height="180dp"
-              android:viewportWidth="1280" android:viewportHeight="720">
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="320dp" android:height="180dp" android:viewportWidth="1280" android:viewportHeight="720">
             <path android:fillColor="#05080D" android:pathData="M0,0h1280v720h-1280z"/>
             <path android:fillColor="#F5142D" android:pathData="M110,220Q110,180 150,180H390Q430,180 430,220V460Q430,500 390,500H150Q110,500 110,460Z"/>
             <path android:fillColor="#FFFFFF" android:pathData="M230,250L230,430L365,340Z"/>
             <path android:fillColor="#F5142D" android:pathData="M500,245h100v55h-100zM500,335h100v55h-100z"/>
             <path android:fillColor="#FFFFFF" android:pathData="M625,245h430v55h-430zM625,335h330v55h-330z"/>
-            <path android:fillColor="#F5142D" android:pathData="M500,430h555v18h-555z"/>
           </vector>
           EOF
-
           sed -i 's|@mipmap/app_banner|@drawable/betube_banner|g; s|@mipmap/app_logo|@drawable/betube_icon|g; s|@mipmap/app_icon_alt|@drawable/betube_icon|g; s|@mipmap/app_icon|@drawable/betube_icon|g' smarttubetv/src/main/AndroidManifest.xml
           sed -i 's|@mipmap/app_logo_semi_red|@drawable/betube_icon|g; s|@mipmap/app_logo_semi_grey|@drawable/betube_icon|g; s|@mipmap/app_logo|@drawable/betube_icon|g' smarttubetv/src/main/res/values/styles.xml
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -63,22 +46,19 @@ jobs:
           java-version: '17'
           cache: gradle
           cache-dependency-path: source/**/*.gradle*
-
       - name: Build BeTube stable debug APK
         working-directory: source
         run: |
           chmod +x gradlew
           ./gradlew :smarttubetv:assembleStstableDebug --stacktrace
-
-      - name: Collect APKs
+      - name: Collect APK
         run: |
           mkdir -p out
-          find source/smarttubetv/build/outputs/apk -type f -name '*.apk' -exec cp {} out/ \;
+          find source/smarttubetv/build/outputs/apk -type f -name '*.apk' -exec cp {} out/BeTube.apk \; -quit
           ls -lh out
-
       - name: Upload BeTube APK
         uses: actions/upload-artifact@v4
         with:
           name: BeTube-Android-TV-32.38
-          path: out/*.apk
+          path: out/BeTube.apk
           if-no-files-found: error
